@@ -3,6 +3,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 import numpy as np
 from .dilated_conv import DilatedConvEncoder
+import math
 
 def generate_continuous_mask(B, T, n=5, l=0.1):
     res = paddle.full((B, T), True, dtype='bool')
@@ -30,7 +31,12 @@ class TSEncoder(nn.Layer):
         self.output_dims = output_dims
         self.hidden_dims = hidden_dims
         self.mask_mode = mask_mode
-        self.input_fc = nn.Linear(input_dims, hidden_dims)
+        self.input_fc = nn.Linear(input_dims, hidden_dims,
+            weight_attr=paddle.framework.ParamAttr(
+                initializer=paddle.nn.initializer.Uniform(-math.sqrt(1./input_dims), math.sqrt(1./input_dims))),
+            bias_attr=paddle.framework.ParamAttr(
+                initializer=paddle.nn.initializer.Uniform(-math.sqrt(1./input_dims), math.sqrt(1./input_dims)))
+        )
         self.feature_extractor = DilatedConvEncoder(
             hidden_dims,
             [hidden_dims] * depth + [output_dims],
@@ -42,7 +48,6 @@ class TSEncoder(nn.Layer):
         nan_mask = ~x.isnan().any(axis=-1)
         x[~nan_mask] = 0
         x = self.input_fc(x)  # B x T x Ch
-        
         # generate & apply mask
         if mask is None:
             if self.training:

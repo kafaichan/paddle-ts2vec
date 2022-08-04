@@ -55,7 +55,8 @@ if __name__ == '__main__':
     os.makedirs(run_dir, exist_ok=True)
     
     t = time.time()
-    paddle.device.set_device("cpu")
+    #paddle.device.set_device("cpu")
+    #paddle.seed(args.seed)
     model = TS2Vec(
         input_dims=train_data.shape[-1],
         **config

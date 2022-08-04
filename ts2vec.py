@@ -115,13 +115,6 @@ class TS2Vec:
                 crop_eright = np.random.randint(low=crop_right, high=ts_l + 1)
                 crop_offset = np.random.randint(low=-crop_eleft, high=ts_l - crop_eright + 1, size=x.shape[0])
 
-                crop_l = 1204
-                crop_left = 894
-                crop_right = 2098
-                crop_eleft = 252
-                crop_eright = 2546
-                crop_offset = np.array([-133, 250])
-
                 out1 = self._net(take_per_row(x, crop_offset + crop_eleft, crop_right - crop_eleft))
                 out1 = out1[:, -crop_l:]
                 
@@ -137,6 +130,7 @@ class TS2Vec:
                 loss.backward()
                 optimizer.step()
                 self.net.step()
+                #self.net.apply(need_restore=False)
                 optimizer.clear_grad()
                 self.net.clear_grad()
                     
@@ -227,53 +221,31 @@ class TS2Vec:
             batch_size = self.batch_size
         n_samples, ts_l, _ = data.shape
 
-        
         dataset = TS2VecDataset(paddle.to_tensor(data, dtype='float32'))
         loader = DataLoader(dataset, batch_size=batch_size)
         
-        with self.net.apply(need_restore=False):
-            with paddle.no_grad():
-                output = []
-                for batch in loader():
-                    x = batch
-                    if sliding_length is not None:
-                        reprs = []
+        self._net.eval()
+        self.net.apply(need_restore=False)
+        with paddle.no_grad():
+            output = []
+            for batch in loader():
+                x = batch
+                if sliding_length is not None:
+                    reprs = []
+                    if n_samples < batch_size:
+                        calc_buffer = []
+                        calc_buffer_l = 0
+                    for i in range(0, ts_l, sliding_length):
+                        l = i - sliding_padding
+                        r = i + sliding_length + (sliding_padding if not casual else 0)
+                        x_sliding = torch_pad_nan(
+                            x[:, max(l, 0) : min(r, ts_l)],
+                            left=-l if l<0 else 0,
+                            right=r-ts_l if r>ts_l else 0,
+                            dim=1
+                        )
                         if n_samples < batch_size:
-                            calc_buffer = []
-                            calc_buffer_l = 0
-                        for i in range(0, ts_l, sliding_length):
-                            l = i - sliding_padding
-                            r = i + sliding_length + (sliding_padding if not casual else 0)
-                            x_sliding = torch_pad_nan(
-                                x[:, max(l, 0) : min(r, ts_l)],
-                                left=-l if l<0 else 0,
-                                right=r-ts_l if r>ts_l else 0,
-                                dim=1
-                            )
-                            if n_samples < batch_size:
-                                if calc_buffer_l + n_samples > batch_size:
-                                    out = self._eval_with_pooling(
-                                        paddle.concat(calc_buffer, axis=0),
-                                        mask,
-                                        slicing=slice(sliding_padding, sliding_padding+sliding_length),
-                                        encoding_window=encoding_window
-                                    )
-                                    reprs += paddle.split(out, out.shape[0]//n_samples, axis=0)
-                                    calc_buffer = []
-                                    calc_buffer_l = 0
-                                calc_buffer.append(x_sliding)
-                                calc_buffer_l += n_samples
-                            else:
-                                out = self._eval_with_pooling(
-                                    x_sliding,
-                                    mask,
-                                    slicing=slice(sliding_padding, sliding_padding+sliding_length),
-                                    encoding_window=encoding_window
-                                )
-                                reprs.append(out)
-
-                        if n_samples < batch_size:
-                            if calc_buffer_l > 0:
+                            if calc_buffer_l + n_samples > batch_size:
                                 out = self._eval_with_pooling(
                                     paddle.concat(calc_buffer, axis=0),
                                     mask,
@@ -283,21 +255,43 @@ class TS2Vec:
                                 reprs += paddle.split(out, out.shape[0]//n_samples)
                                 calc_buffer = []
                                 calc_buffer_l = 0
-                        
-                        out = paddle.concat(reprs, axis=1)
-                        if encoding_window == 'full_series':
-                            out = F.max_pool1d(
-                                out.transpose(perm=[0,2,1]),
-                                kernel_size = out.size(1),
-                            ).squeeze(1)
-                    else:
-                        out = self._eval_with_pooling(x, mask, encoding_window=encoding_window)
-                        if encoding_window == 'full_series':
-                            out = out.squeeze(1)
-                            
-                    output.append(out)
-                    
-                output = paddle.concat(output, axis=0)
+                            calc_buffer.append(x_sliding)
+                            calc_buffer_l += n_samples
+                        else:
+                            out = self._eval_with_pooling(
+                                x_sliding,
+                                mask,
+                                slicing=slice(sliding_padding, sliding_padding+sliding_length),
+                                encoding_window=encoding_window
+                            )
+                            reprs.append(out)
+
+                    if n_samples < batch_size:
+                        if calc_buffer_l > 0:
+                            out = self._eval_with_pooling(
+                                paddle.concat(calc_buffer, axis=0),
+                                mask,
+                                slicing=slice(sliding_padding, sliding_padding+sliding_length),
+                                encoding_window=encoding_window
+                            )
+                            reprs += paddle.split(out, out.shape[0]//n_samples)
+                            calc_buffer = []
+                            calc_buffer_l = 0
+
+                    out = paddle.concat(reprs, axis=1)
+                    if encoding_window == 'full_series':
+                        out = F.max_pool1d(
+                            out.transpose(perm=[0,2,1]),
+                            kernel_size = out.shape(1),
+                        ).squeeze(1)
+                else:
+                    out = self._eval_with_pooling(x, mask, encoding_window=encoding_window)
+                    if encoding_window == 'full_series':
+                        out = out.squeeze(1)
+
+                output.append(out)
+
+            output = paddle.concat(output, axis=0)
             
         return output.numpy()
     
