@@ -31,8 +31,9 @@ def instance_contrastive_loss(z1, z2):
     logits += paddle.triu(sim, diagonal=1)[:, :, 1:]
     logits = -F.log_softmax(logits, axis=-1)
     
-    i = paddle.arange(B)
-    loss = (logits.numpy()[:, i, B + i - 1].mean() + logits.numpy()[:, B + i, i].mean()) / 2
+    #i = paddle.arange(B)
+    loss = (logits[:,0:B, B-1:(2*B-1)].mean() + logits[:, B:2*B, 0:B].mean()) / 2
+    #loss = (logits.numpy()[:, i, B + i - 1].mean() + logits.numpy()[:, B + i, i].mean()) / 2
     return loss
 
 def temporal_contrastive_loss(z1, z2):
@@ -45,6 +46,7 @@ def temporal_contrastive_loss(z1, z2):
     logits += paddle.triu(sim, diagonal=1)[:, :, 1:]
     logits = -F.log_softmax(logits, axis=-1)
     
-    t = paddle.arange(T)
-    loss = (logits.numpy()[:, t, T + t - 1].mean() + logits.numpy()[:, T + t, t].mean()) / 2
+    #t = paddle.arange(T)
+    loss = (logits[:, 0:T, T-1:(2*T-1)].mean() + logits[:, T:2*T, 0:T].mean()) / 2
+    #loss = (logits.numpy()[:, t, T + t - 1].mean() + logits.numpy()[:, T + t, t].mean()) / 2
     return loss
