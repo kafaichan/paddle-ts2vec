@@ -45,6 +45,8 @@
   ![table7_ettm1](imgs/table7_ettm1.JPG)
 
   * Paddle实现结果 (Electricity)
+  ![table7_electricity](imgs/table7_electricity.JPG)
+
 
 * 原论文 Table 8
 
@@ -57,7 +59,7 @@
   ![table8_etth2](imgs/table8_etth2.JPG)
 
   * Paddle实现结果 (ETTm1)
-  ![table8_ettm1]()
+  ![table8_ettm1](imgs/table8_ettm1.JPG)
 
   * Paddle实现结果 (Electricity)
 
