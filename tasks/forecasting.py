@@ -55,27 +55,13 @@ def eval_forecasting(model, data, train_slice, valid_slice, test_slice, scaler, 
         test_pred = lr.predict(test_features)
         lr_infer_time[pred_len] = time.time() - t
 
-        #ori_shape = test_data.shape[0], -1, pred_len, test_data.shape[2]
-        if test_data.shape[-1] > 1:
-            test_pred = test_pred.reshape([-1, 7])
-            test_labels = test_labels.reshape([-1,7])
-
-        if test_data.shape[0] > 1:
-            test_pred_inv = scaler.inverse_transform(test_pred.swapaxes(0, 3)).swapaxes(0, 3)
-            test_labels_inv = scaler.inverse_transform(test_labels.swapaxes(0, 3)).swapaxes(0, 3)
-        else:
-            test_pred_inv = scaler.inverse_transform(test_pred)
-            test_labels_inv = scaler.inverse_transform(test_labels)
             
         out_log[pred_len] = {
             'norm': test_pred,
-            'raw': test_pred_inv,
-            'norm_gt': test_labels,
-            'raw_gt': test_labels_inv
+            'norm_gt': test_labels
         }
         ours_result[pred_len] = {
-            'norm': cal_metrics(test_pred, test_labels),
-            'raw': cal_metrics(test_pred_inv, test_labels_inv)
+            'norm': cal_metrics(test_pred, test_labels)
         }
         
     eval_res = {
